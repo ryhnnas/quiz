@@ -20,12 +20,12 @@ var questions = []Question{
 	},
 	{
 		Question: "Siapa presiden pertama Indonesia?",
-		Options:  []string{"Soekarno", "Soeharto", "Jokowi", "Habibie"},
+		Options:  []string{"Habibie", "Soeharto", "Jokowi", "Soekarno"},
 		Answer:   "Soekarno",
 	},
 	{
 		Question: "Apa warna bendera Indonesia?",
-		Options:  []string{"Merah dan Putih", "Merah dan Kuning", "Biru dan Putih", "Hijau dan Putih"},
+		Options:  []string{"Merah dan Kuning", "Merah dan Putih", "Biru dan Putih", "Hijau dan Putih"},
 		Answer:   "Merah dan Putih",
 	},
 }
@@ -36,39 +36,34 @@ func main() {
 	http.HandleFunc("/", homeHandler)
 	http.HandleFunc("/quiz", quizHandler)
 	http.HandleFunc("/result", resultHandler)
+	http.HandleFunc("/style.css", stylesHandler)
 
 	http.ListenAndServe(":8080", nil)
+}
+
+func stylesHandler(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, "style.css")
 }
 
 func homeHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl := `
     <!DOCTYPE html>
-    <html>
+    <html lang="id">
     <head>
-        <title>Quiz App</title>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                background-color: #f4f4f4;
-                color: #333;
-                text-align: center;
-                padding: 50px;
-            }
-            a {
-                text-decoration: none;
-                color: #fff;
-                background-color: #007bff;
-                padding: 10px 20px;
-                border-radius: 5px;
-            }
-            a:hover {
-                background-color: #0056b3;
-            }
-        </style>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Quiz Indonesia</title>
+        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="/style.css">
     </head>
-    <body>
-        <h1>Selamat Datang di Quiz</h1>
-        <a href="/quiz">Mulai Kuis</a>
+    <body class="home-bg">
+        <div class="container">
+            <div class="card">
+                <h1>🇮🇩 Quiz Indonesia</h1>
+                <p>Uji pengetahuanmu tentang Indonesia!</p>
+                <a href="/quiz" class="btn btn-primary">Mulai Kuis</a>
+            </div>
+        </div>
     </body>
     </html>
     `
@@ -77,116 +72,107 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 
 func quizHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost {
-		score = 0
-		for i, question := range questions {
-			answer := r.FormValue("question" + strconv.Itoa(i))
-			if answer == question.Answer {
-				score++
-			}
+		currentIndex, _ := strconv.Atoi(r.FormValue("currentIndex"))
+		answer := r.FormValue("answer")
+
+		if answer == questions[currentIndex].Answer {
+			score++
 		}
-		http.Redirect(w, r, "/result", http.StatusSeeOther)
+
+		currentIndex++
+
+		if currentIndex >= len(questions) {
+			http.Redirect(w, r, "/result", http.StatusSeeOther)
+			return
+		}
+
+		http.Redirect(w, r, "/quiz?index="+strconv.Itoa(currentIndex), http.StatusSeeOther)
 		return
 	}
 
+	currentIndex, _ := strconv.Atoi(r.URL.Query().Get("index"))
+	if currentIndex < 0 || currentIndex >= len(questions) {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	timerDuration := 30 // seconds
+
 	tmpl := `
     <!DOCTYPE html>
-    <html>
+    <html lang="id">
     <head>
-        <title>Quiz</title>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                background-color: #f4f4f4;
-                color: #333;
-                padding: 20px;
-            }
-            h1 {
-                color: #007bff;
-            }
-            fieldset {
-                border: 2px solid #007bff;
-                border-radius: 5px;
-                padding: 10px;
-                margin-bottom: 20px;
-            }
-            legend {
-                font-weight: bold;
-                color: #007bff;
-            }
-            label {
-                display: block;
-                margin: 5px 0;
-            }
-            button {
-                background-color: #007bff;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 5px;
-                cursor: pointer;
-            }
-            button:hover {
-                background-color: #0056b3;
-            }
-        </style>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Quiz Indonesia</title>
+        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="/style.css">
     </head>
-    <body>
-        <h1>Kuis</h1>
-        <form method="POST">
-            {{range $index, $question := .}}
-                <fieldset>
-                    <legend>{{$question.Question}}</legend>
-                    {{range $option := $question.Options}}
-                        <label>
-                            <input type="radio" name="question{{ $index }}" value="{{ $option }}" required>
-                            {{ $option }}
-                        </label>
-                    {{end}}
-                </fieldset>
-            {{end}}
-            <button type="submit">Kirim Jawaban</button>
-        </form>
+    <body class="quiz-bg">
+        <div class="container">
+            <div class="quiz-card">
+                <div class="timer" id="timer">Waktu tersisa: ` + strconv.Itoa(timerDuration) + ` detik</div>
+                <form id="quizForm" method="POST">
+                    <input type="hidden" name="currentIndex" value="` + strconv.Itoa(currentIndex) + `">
+                    <h2>` + questions[currentIndex].Question + `</h2>
+                    <div class="options">
+                        {{range .Options}}
+                            <label class="option">
+                                <input type="radio" name="answer" value="{{.}}" required>
+                                <span>{{.}}</span>
+                            </label>
+                        {{end}}
+                    </div>
+                    <button type="submit" class="btn btn-submit">Kirim Jawaban</button>
+                </form>
+            </div>
+        </div>
+        <script>
+            let timeLeft = ` + strconv.Itoa(timerDuration) + `;
+            const timerElement = document.getElementById('timer');
+            const countdown = setInterval(() => {
+                if (timeLeft <= 0) {
+                    clearInterval(countdown);
+                    document.getElementById('quizForm').submit();
+                } else {
+                    timerElement.innerHTML = 'Waktu tersisa: ' + timeLeft + ' detik';
+                }
+                timeLeft -= 1;
+            }, 1000);
+        </script>
     </body>
     </html>
     `
 	t := template.New("quiz")
 	t, _ = t.Parse(tmpl)
-	t.Execute(w, questions)
+	t.Execute(w, questions[currentIndex])
 }
 
 func resultHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl := `
     <!DOCTYPE html>
-    <html>
+    <html lang="id">
     <head>
-        <title>Hasil Kuis</title>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                background-color: #f4f4f4;
-                color: #333;
-                text-align: center;
-                padding: 20px;
-            }
-            h1 {
-                color: #007bff;
-            }
-            a {
-                text-decoration: none;
-                color: #fff;
-                background-color: #007bff;
-                padding: 10px 20px;
-                border-radius: 5px;
-            }
-            a:hover {
-                background-color: #0056b3;
-            }
-        </style>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Hasil Quiz</title>
+        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+        <link rel="stylesheet" href="/style.css">
     </head>
-    <body>
-        <h1>Hasil Kuis</h1>
-        <p>Skor Anda: {{.}}</p>
-        <a href="/">Kembali ke Beranda</a>
+    <body class="result-bg">
+        <div class="container">
+            <div class="result-card">
+                <h1>Hasil Kuis</h1>
+                <div class="score">
+                    <p>Skor Anda:</p>
+                    <span class="score-value">{{.}}/3</span>
+                </div>
+                <div class="result-actions">
+                    <a href="/" class="btn btn-primary">Kembali ke Beranda</a>
+                    <a href="/quiz" class="btn btn-secondary">Coba Lagi</a>
+                </div>
+            </div>
+        </div>
     </body>
     </html>
     `
